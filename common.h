@@ -33,6 +33,10 @@
 #include <drm_fourcc.h>
 #include <stdbool.h>
 
+#ifndef KMSCUBE_RESERVED_MINIGBM_PLANE
+#define KMSCUBE_RESERVED_MINIGBM_PLANE 1
+#endif
+
 #ifndef DRM_FORMAT_MOD_LINEAR
 #define DRM_FORMAT_MOD_LINEAR 0
 #endif

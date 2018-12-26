@@ -229,7 +229,7 @@ static int get_fd_rgba(uint32_t *pstride, uint64_t *modifier)
 	/* NOTE: do not actually use GBM_BO_USE_WRITE since that gets us a dumb buffer: */
 	bo = gbm_bo_create(gl.gbm->dev, texw, texh, GBM_FORMAT_ABGR8888, GBM_BO_USE_LINEAR);
 
-	map = gbm_bo_map(bo, 0, 0, texw, texh, GBM_BO_TRANSFER_WRITE, &stride, &map_data);
+	map = gbm_bo_map(bo, 0, 0, texw, texh, GBM_BO_TRANSFER_WRITE, &stride, &map_data, KMSCUBE_RESERVED_MINIGBM_PLANE);
 
 	for (uint32_t i = 0; i < texh; i++) {
 		memcpy(&map[stride * i], &src[texw * 4 * i], texw * 4);
@@ -264,7 +264,7 @@ static int get_fd_y(uint32_t *pstride, uint64_t *modifier)
 	/* NOTE: do not actually use GBM_BO_USE_WRITE since that gets us a dumb buffer: */
 	bo = gbm_bo_create(gl.gbm->dev, texw, texh, GBM_FORMAT_R8, GBM_BO_USE_LINEAR);
 
-	map = gbm_bo_map(bo, 0, 0, texw, texh, GBM_BO_TRANSFER_WRITE, &stride, &map_data);
+	map = gbm_bo_map(bo, 0, 0, texw, texh, GBM_BO_TRANSFER_WRITE, &stride, &map_data, KMSCUBE_RESERVED_MINIGBM_PLANE);
 
 	for (uint32_t i = 0; i < texh; i++) {
 		memcpy(&map[stride * i], &src[texw * i], texw);
@@ -299,7 +299,7 @@ static int get_fd_uv(uint32_t *pstride, uint64_t *modifier)
 	/* NOTE: do not actually use GBM_BO_USE_WRITE since that gets us a dumb buffer: */
 	bo = gbm_bo_create(gl.gbm->dev, texw/2, texh/2, GBM_FORMAT_GR88, GBM_BO_USE_LINEAR);
 
-	map = gbm_bo_map(bo, 0, 0, texw/2, texh/2, GBM_BO_TRANSFER_WRITE, &stride, &map_data);
+	map = gbm_bo_map(bo, 0, 0, texw/2, texh/2, GBM_BO_TRANSFER_WRITE, &stride, &map_data, KMSCUBE_RESERVED_MINIGBM_PLANE);
 
 	for (uint32_t i = 0; i < texh/2; i++) {
 		memcpy(&map[stride * i], &src[texw * i], texw);
@@ -347,7 +347,7 @@ static int init_tex_rgba(void)
 		attr[size - 3] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT;
 		attr[size - 2] = modifier >> 32;
 	}
-	EGLImage img;
+	EGLImageKHR img;
 
 	glGenTextures(1, gl.tex);
 
@@ -412,7 +412,7 @@ static int init_tex_nv12_2img(void)
 		attr_uv[size - 2] = modifier_uv >> 32;
 	}
 
-	EGLImage img_y, img_uv;
+	EGLImageKHR img_y, img_uv;
 
 	glGenTextures(2, gl.tex);
 
@@ -469,7 +469,7 @@ static int init_tex_nv12_1img(void)
 		EGL_NONE, EGL_NONE,	/* modifier hi */
 		EGL_NONE
 	};
-	EGLImage img;
+	EGLImageKHR img;
 
 	if (egl->modifiers_supported &&
 	    modifier_y != DRM_FORMAT_MOD_INVALID &&
