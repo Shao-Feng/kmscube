@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "common.h"
 
@@ -42,8 +43,12 @@ gbm_surface_create_with_modifiers(struct gbm_device *gbm,
 
 const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
 {
-	gbm.dev = gbm_create_device(drm_fd);
+        printf("drm_fd: %d\n", drm_fd);
+	//gbm.dev = gbm_create_device(drm_fd);
+        gbm.dev = EGL_DEFAULT_DISPLAY;
+        printf("gbm.dev: %d, EGL_DEFAULT_DISPLAY: %d\n", gbm.dev, EGL_DEFAULT_DISPLAY);
 	gbm.format = GBM_FORMAT_XRGB8888;
+        //gbm.format = DRM_FORMAT_XRGB8888;
 	gbm.surface = NULL;
 
 	if (gbm_surface_create_with_modifiers) {
@@ -122,42 +127,14 @@ static bool
 egl_choose_config(EGLDisplay egl_display, const EGLint *attribs,
                   EGLint visual_id, EGLConfig *config_out)
 {
-	EGLint count = 0;
+	EGLint count = 1;
 	EGLint matched = 0;
-	EGLConfig *configs;
-	int config_index = -1;
 
-	if (!eglGetConfigs(egl_display, NULL, 0, &count) || count < 1) {
-		printf("No EGL configs to choose from.\n");
-		return false;
-	}
-	configs = malloc(count * sizeof *configs);
-	if (!configs)
-		return false;
-
-	if (!eglChooseConfig(egl_display, attribs, configs,
-			      count, &matched) || !matched) {
+	if (!eglChooseConfig(egl_display, attribs, config_out,
+			      count, &matched) || matched != 1) {
 		printf("No EGL configs with appropriate attributes.\n");
-		goto out;
+                return false;
 	}
-
-	if (!visual_id)
-		config_index = 0;
-
-	if (config_index == -1)
-		config_index = match_config_to_visual(egl_display,
-						      visual_id,
-						      configs,
-						      matched);
-
-	if (config_index != -1)
-		*config_out = configs[config_index];
-
-out:
-	free(configs);
-	if (config_index == -1)
-		return false;
-
 	return true;
 }
 
@@ -165,6 +142,7 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 {
 	EGLint major, minor;
 
+        /*
 	static const EGLint context_attribs[] = {
 		EGL_CONTEXT_CLIENT_VERSION, 2,
 		EGL_NONE
@@ -179,7 +157,14 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 		EGL_SAMPLES, samples,
 		EGL_NONE
-	};
+	};*/
+	
+        static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2,
+                                           EGL_NONE};
+
+        const EGLint config_attribs[] = {EGL_SURFACE_TYPE, EGL_DONT_CARE,
+                                          EGL_NONE};
+
 	const char *egl_exts_client, *egl_exts_dpy, *gl_exts;
 
 #define get_proc_client(ext, name) do { \
@@ -197,14 +182,8 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 	} while (0)
 
 	egl_exts_client = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
-	get_proc_client(EGL_EXT_platform_base, eglGetPlatformDisplayEXT);
 
-	if (egl->eglGetPlatformDisplayEXT) {
-		egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR,
-				gbm->dev, NULL);
-	} else {
-		egl->display = eglGetDisplay((void *)gbm->dev);
-	}
+	egl->display = eglGetDisplay((void *)gbm->dev);
 
 	if (!eglInitialize(egl->display, &major, &minor)) {
 		printf("failed to initialize\n");
@@ -219,6 +198,20 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 	get_proc_dpy(EGL_KHR_fence_sync, eglWaitSyncKHR);
 	get_proc_dpy(EGL_KHR_fence_sync, eglClientWaitSyncKHR);
 	get_proc_dpy(EGL_ANDROID_native_fence_sync, eglDupNativeFenceFDANDROID);
+
+#define get_proc(name, proc)                  \
+  do {                                        \
+    egl->name = (proc)eglGetProcAddress(#name); \
+    assert(egl->name);                          \
+  } while (0)
+	get_proc(eglCreateImageKHR, PFNEGLCREATEIMAGEKHRPROC);
+	get_proc(eglCreateSyncKHR, PFNEGLCREATESYNCKHRPROC);
+	get_proc(eglDestroySyncKHR, PFNEGLDESTROYSYNCKHRPROC);
+	get_proc(eglWaitSyncKHR, PFNEGLWAITSYNCKHRPROC);
+	get_proc(eglClientWaitSyncKHR, PFNEGLCLIENTWAITSYNCKHRPROC);
+	get_proc(eglDupNativeFenceFDANDROID, PFNEGLDUPNATIVEFENCEFDANDROIDPROC);
+	get_proc(glEGLImageTargetTexture2DOES, PFNGLEGLIMAGETARGETTEXTURE2DOESPROC);
+	get_proc(eglDestroyImageKHR, PFNEGLDESTROYIMAGEKHRPROC);
 
 	egl->modifiers_supported = has_ext(egl_exts_dpy,
 					   "EGL_EXT_image_dma_buf_import_modifiers");
@@ -245,6 +238,11 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 		return -1;
 	}
 
+        if (egl->config == NULL){
+                printf("Config is NULL\n");
+                return -1;
+        }
+
 	egl->context = eglCreateContext(egl->display, egl->config,
 			EGL_NO_CONTEXT, context_attribs);
 	if (egl->context == NULL) {
@@ -252,15 +250,17 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 		return -1;
 	}
 
+        /*
 	egl->surface = eglCreateWindowSurface(egl->display, egl->config,
 			(EGLNativeWindowType)gbm->surface, NULL);
 	if (egl->surface == EGL_NO_SURFACE) {
 		printf("failed to create egl surface\n");
 		return -1;
-	}
+	}*/
 
 	/* connect the context to the surface */
-	eglMakeCurrent(egl->display, egl->surface, egl->surface, egl->context);
+	//eglMakeCurrent(egl->display, egl->surface, egl->surface, egl->context);
+	eglMakeCurrent(egl->display, EGL_NO_SURFACE, EGL_NO_SURFACE, egl->context);
 
 	gl_exts = (char *) glGetString(GL_EXTENSIONS);
 	printf("OpenGL ES 2.x information:\n");

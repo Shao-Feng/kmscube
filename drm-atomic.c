@@ -228,11 +228,14 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		egl->eglDestroySyncKHR(egl->display, gpu_fence);
 		assert(drm.kms_in_fence_fd != -1);
 
+		//TODO need to create Frame buffer from gbm buffer object, instead of surface
+                //refer to Line 400 in :~/debug_patches/kmscube/src/gbm_es2_demo$ vi ged_lib/egl_drm_glue.cpp
 		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
 		if (!next_bo) {
 			printf("Failed to lock frontbuffer\n");
 			return -1;
 		}
+
 		fb = drm_fb_get_from_bo(next_bo);
 		if (!fb) {
 			printf("Failed to get a new framebuffer BO\n");
@@ -290,16 +293,17 @@ static int get_plane_id(void)
 	drmModePlaneResPtr plane_resources;
 	uint32_t i, j;
 	int ret = -EINVAL;
-	int found_primary = 0;
+	int found_reserved = 0;
 
 	plane_resources = drmModeGetPlaneResources(drm.fd);
 	if (!plane_resources) {
 		printf("drmModeGetPlaneResources failed: %s\n", strerror(errno));
 		return -1;
 	}
-
-	for (i = 0; (i < plane_resources->count_planes) && !found_primary; i++) {
+	//TODO only second plane is reserved
+	for (i = 0; (i < plane_resources->count_planes) && !found_reserved; i++) {
 		uint32_t id = plane_resources->planes[i];
+                printf("------------Plane[%d]-------------\n", id);
 		drmModePlanePtr plane = drmModeGetPlane(drm.fd, id);
 		if (!plane) {
 			printf("drmModeGetPlane(%u) failed: %s\n", id, strerror(errno));
@@ -309,7 +313,12 @@ static int get_plane_id(void)
 		if (plane->possible_crtcs & (1 << drm.crtc_index)) {
 			drmModeObjectPropertiesPtr props =
 				drmModeObjectGetProperties(drm.fd, id, DRM_MODE_OBJECT_PLANE);
-
+                        // Second plane is reserved
+			if (i == 1){
+				ret = id;
+                                found_reserved = 1;
+                        }
+#ifdef USE_PRIMARY_PLANE
 			/* primary or not, this plane is good enough to use: */
 			ret = id;
 
@@ -325,7 +334,7 @@ static int get_plane_id(void)
 
 				drmModeFreeProperty(p);
 			}
-
+#endif
 			drmModeFreeObjectProperties(props);
 		}
 

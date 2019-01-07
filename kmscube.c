@@ -143,6 +143,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+        printf("gbm format: %d (DRM_FORMAT_XRGB8888: %d)\n", gbm->format, DRM_FORMAT_XRGB8888);
+
 	if (mode == SMOOTH)
 		egl = init_cube_smooth(gbm, samples);
 	else if (mode == VIDEO)
