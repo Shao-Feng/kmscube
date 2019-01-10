@@ -173,10 +173,94 @@ static EGLSyncKHR create_fence(const struct egl *egl, int fd)
 	return fence;
 }
 
+static struct drm_fb* CreateFramebuffer(int width, int height, const struct gbm *gbm, const struct egl *egl) {
+    struct gbm_bo *bo = NULL;
+    struct drm_fb* fb = NULL;
+    bo = gbm_bo_create(gbm->dev, width, height, GBM_FORMAT_XRGB8888,
+                                   GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+    if (!bo) {
+      printf("failed to create a gbm buffer.\n");
+      return fb;
+    }
+
+    int fd = gbm_bo_get_fd(bo);
+    if (fd < 0) {
+      printf("failed to get fb for bo: %d\n", fd);
+      return fb;
+    }
+
+    uint32_t fb_id;
+    GLuint gl_tex;
+    GLuint gl_fb;
+
+    uint32_t handle = gbm_bo_get_handle(bo).u32;
+    uint32_t stride = gbm_bo_get_stride(bo);
+    uint32_t offset = 0;
+    drmModeAddFB2(drm.fd, width, height, GBM_FORMAT_XRGB8888, &handle,
+                  &stride, &offset, &fb_id, 0);
+    if (!fb_id) {
+      printf("failed to create framebuffer from buffer object.\n");
+      return fb;
+    }
+
+    printf("fb_id: %d\n", fb_id);
+
+    const EGLint khr_image_attrs[] = {EGL_DMA_BUF_PLANE0_FD_EXT,
+                                      fd,
+                                      EGL_WIDTH,
+                                      width,
+                                      EGL_HEIGHT,
+                                      height,
+                                      EGL_LINUX_DRM_FOURCC_EXT,
+                                      GBM_FORMAT_XRGB8888,
+                                      EGL_DMA_BUF_PLANE0_PITCH_EXT,
+                                      stride,
+                                      EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+                                      offset,
+                                      EGL_NONE};
+
+    EGLImageKHR image =
+        egl->eglCreateImageKHR(egl->display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
+                            NULL, khr_image_attrs);
+    if (image == EGL_NO_IMAGE_KHR) {
+      printf("failed to make image from buffer object: %s\n",
+              eglGetError());
+      return fb;
+    }
+
+    glGenTextures(1, &gl_tex);
+    glBindTexture(GL_TEXTURE_2D, gl_tex);
+    egl->glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenFramebuffers(1, &gl_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           gl_tex, 0);
+
+    printf("gl_fb: %d\n", gl_fb);
+    printf("gl_tex: %d\n", gl_tex);
+
+    fb = calloc(1, sizeof *fb);
+    fb->bo = bo;
+    fb->fb_id = fb_id;
+    printf("fb done. fb id:%d\n", gl_fb);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      printf("failed framebuffer check for created target buffer: %x\n",
+              glCheckFramebufferStatus(GL_FRAMEBUFFER));
+      glDeleteFramebuffers(1, &gl_fb);
+      glDeleteTextures(1, &gl_tex);
+      return NULL;
+    }
+
+    return fb;
+}
+
 static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 {
 	struct gbm_bo *bo = NULL;
-	struct drm_fb *fb;
+	struct drm_fb *fb = NULL;
 	uint32_t i = 0;
 	uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
 	int ret;
@@ -228,19 +312,22 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		egl->eglDestroySyncKHR(egl->display, gpu_fence);
 		assert(drm.kms_in_fence_fd != -1);
 
-		//TODO need to create Frame buffer from gbm buffer object, instead of surface
-                //refer to Line 400 in :~/debug_patches/kmscube/src/gbm_es2_demo$ vi ged_lib/egl_drm_glue.cpp
+		fb = CreateFramebuffer(1920, 1080, gbm, egl);
+
+		/*
 		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
 		if (!next_bo) {
 			printf("Failed to lock frontbuffer\n");
 			return -1;
 		}
 
-		fb = drm_fb_get_from_bo(next_bo);
+		fb = drm_fb_get_from_bo(next_bo);*/
+		
 		if (!fb) {
 			printf("Failed to get a new framebuffer BO\n");
 			return -1;
 		}
+		next_bo = fb->bo;
 
 		if (kms_fence) {
 			EGLint status;

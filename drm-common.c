@@ -58,7 +58,8 @@ drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 {
 	printf("drm_fb_get_from_bo -------------------\n");
-	int drm_fd = gbm_device_get_fd(gbm_bo_get_device(bo));
+	//int drm_fd = gbm_device_get_fd(gbm_bo_get_device(bo));
+        int drm_fd = gbm_bo_get_fd(bo);
         printf("drm_fb_get_from_bo -------------------End---------------------\n");
 	struct drm_fb *fb = gbm_bo_get_user_data(bo);
 	uint32_t width, height, format,

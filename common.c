@@ -44,11 +44,9 @@ gbm_surface_create_with_modifiers(struct gbm_device *gbm,
 const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
 {
         printf("drm_fd: %d\n", drm_fd);
-	//gbm.dev = gbm_create_device(drm_fd);
-        gbm.dev = EGL_DEFAULT_DISPLAY;
-        printf("gbm.dev: %d, EGL_DEFAULT_DISPLAY: %d\n", gbm.dev, EGL_DEFAULT_DISPLAY);
+	gbm.dev = gbm_create_device(drm_fd);
+        //gbm.dev = EGL_DEFAULT_DISPLAY;
 	gbm.format = GBM_FORMAT_XRGB8888;
-        //gbm.format = DRM_FORMAT_XRGB8888;
 	gbm.surface = NULL;
 
 	if (gbm_surface_create_with_modifiers) {
@@ -183,7 +181,7 @@ int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
 
 	egl_exts_client = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
 
-	egl->display = eglGetDisplay((void *)gbm->dev);
+	egl->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
 	if (!eglInitialize(egl->display, &major, &minor)) {
 		printf("failed to initialize\n");

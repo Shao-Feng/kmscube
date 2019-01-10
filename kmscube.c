@@ -127,10 +127,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (atomic)
-		drm = init_drm_atomic(device);
-	else
-		drm = init_drm_legacy(device);
+	//if (atomic)
+	drm = init_drm_atomic(device);
+	//else
+	//	drm = init_drm_legacy(device);
 	if (!drm) {
 		printf("failed to initialize %s DRM\n", atomic ? "atomic" : "legacy");
 		return -1;
