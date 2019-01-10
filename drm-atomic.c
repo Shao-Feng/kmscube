@@ -244,7 +244,6 @@ static struct drm_fb* CreateFramebuffer(int width, int height, const struct gbm 
     fb = calloc(1, sizeof *fb);
     fb->bo = bo;
     fb->fb_id = fb_id;
-    printf("fb done. fb id:%d\n", gl_fb);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
       printf("failed framebuffer check for created target buffer: %x\n",
@@ -274,6 +273,8 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 
 	/* Allow a modeset change for the first commit only. */
 	flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+	fb = CreateFramebuffer(1920, 1080, gbm, egl);
 
 	while (1) {
 		struct gbm_bo *next_bo;
@@ -312,7 +313,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		egl->eglDestroySyncKHR(egl->display, gpu_fence);
 		assert(drm.kms_in_fence_fd != -1);
 
-		fb = CreateFramebuffer(1920, 1080, gbm, egl);
+		//fb = CreateFramebuffer(1920, 1080, gbm, egl);
 
 		/*
 		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
@@ -354,7 +355,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		ret = drm_atomic_commit(fb->fb_id, flags);
 		if (ret) {
 			printf("failed to commit: %s\n", strerror(errno));
-			return -1;
+			//return -1;
 		}
 
 		/* release last buffer to render on again: */
@@ -400,8 +401,8 @@ static int get_plane_id(void)
 		if (plane->possible_crtcs & (1 << drm.crtc_index)) {
 			drmModeObjectPropertiesPtr props =
 				drmModeObjectGetProperties(drm.fd, id, DRM_MODE_OBJECT_PLANE);
-                        // Second plane is reserved
-			if (i == 1){
+                        // Third plane is reserved
+			if (i == 2){
 				ret = id;
                                 found_reserved = 1;
                         }
