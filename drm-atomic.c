@@ -355,6 +355,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		ret = drm_atomic_commit(fb->fb_id, flags);
 		if (ret) {
 			printf("failed to commit: %s\n", strerror(errno));
+			printf("ret:%d\n", ret);
 			//return -1;
 		}
 
