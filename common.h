@@ -50,6 +50,14 @@
 #define EGL_PLATFORM_GBM_KHR              0x31D7
 #endif /* EGL_KHR_platform_gbm */
 
+#ifndef KMSCUBE_DISPLAY_WIDTH
+#define KMSCUBE_DISPLAY_WIDTH 800
+#endif
+
+#ifndef KMSCUBE_DISPLAY_HEIGHT
+#define KMSCUBE_DISPLAY_HEIGHT 600
+#endif
+
 #ifndef EGL_EXT_platform_base
 #define EGL_EXT_platform_base 1
 typedef EGLDisplay (EGLAPIENTRYP PFNEGLGETPLATFORMDISPLAYEXTPROC) (EGLenum platform, void *native_display, const EGLint *attrib_list);

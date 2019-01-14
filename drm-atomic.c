@@ -133,12 +133,16 @@ static int drm_atomic_commit(uint32_t fb_id, uint32_t flags)
 	add_plane_property(req, plane_id, "CRTC_ID", drm.crtc_id);
 	add_plane_property(req, plane_id, "SRC_X", 0);
 	add_plane_property(req, plane_id, "SRC_Y", 0);
-	add_plane_property(req, plane_id, "SRC_W", drm.mode->hdisplay << 16);
-	add_plane_property(req, plane_id, "SRC_H", drm.mode->vdisplay << 16);
+	//add_plane_property(req, plane_id, "SRC_W", drm.mode->hdisplay << 16);
+	//add_plane_property(req, plane_id, "SRC_H", drm.mode->vdisplay << 16);
+	add_plane_property(req, plane_id, "SRC_W", KMSCUBE_DISPLAY_WIDTH << 16);
+	add_plane_property(req, plane_id, "SRC_H", KMSCUBE_DISPLAY_HEIGHT << 16);
 	add_plane_property(req, plane_id, "CRTC_X", 0);
 	add_plane_property(req, plane_id, "CRTC_Y", 0);
-	add_plane_property(req, plane_id, "CRTC_W", drm.mode->hdisplay);
-	add_plane_property(req, plane_id, "CRTC_H", drm.mode->vdisplay);
+	//add_plane_property(req, plane_id, "CRTC_W", drm.mode->hdisplay);
+	//add_plane_property(req, plane_id, "CRTC_H", drm.mode->vdisplay);
+	add_plane_property(req, plane_id, "CRTC_W", KMSCUBE_DISPLAY_WIDTH);
+        add_plane_property(req, plane_id, "CRTC_H", KMSCUBE_DISPLAY_HEIGHT);
 
 	if (drm.kms_in_fence_fd != -1) {
 		add_crtc_property(req, drm.crtc_id, "OUT_FENCE_PTR",
@@ -274,7 +278,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 	/* Allow a modeset change for the first commit only. */
 	flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
-	fb = CreateFramebuffer(1920, 1080, gbm, egl);
+	fb = CreateFramebuffer(KMSCUBE_DISPLAY_WIDTH, KMSCUBE_DISPLAY_HEIGHT, gbm, egl);
 
 	while (1) {
 		struct gbm_bo *next_bo;
@@ -357,6 +361,14 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 			printf("failed to commit: %s\n", strerror(errno));
 			printf("ret:%d\n", ret);
 			//return -1;
+			uint8_t retry = 0;
+			while (ret == -16 && retry < 10){
+				usleep(15);
+				ret = drm_atomic_commit(fb->fb_id, flags);
+				printf("failed to commit in loop[%d]: %s\n", retry, strerror(errno));
+	                        printf("ret:%d\n", ret);
+				retry++;
+			}
 		}
 
 		/* release last buffer to render on again: */
