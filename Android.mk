@@ -22,7 +22,8 @@ LOCAL_SHARED_LIBRARIES := \
         libsync \
         libui \
         libminigbm \
-        libutils 
+        libutils \
+        libhwcservice
 
 LOCAL_C_INCLUDES := \
         system/core/include/utils \

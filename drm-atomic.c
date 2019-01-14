@@ -28,6 +28,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <hwcserviceapi.h>
+
 #include "common.h"
 #include "drm-common.h"
 
