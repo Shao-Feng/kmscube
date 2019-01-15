@@ -19,7 +19,9 @@ Patch Kernel
 ==========
 
 https://android.intel.com/#/c/639800/4
+
 https://android.intel.com/#/c/639798/5
+
 https://android.intel.com/#/c/639796/5
 
 
@@ -44,12 +46,17 @@ Build kmscube
 ==========
 
 cd <HWC_PATH>
+
 git clone https://github.com/Shao-Feng/kmscube.git
+
 Add 2 line in <HWC_PATH>/Android.mk as below
 
 """
+
 include $(HWC_PATH)/kmscube/wrap/Android.mk
+
 include $(HWC_PATH)/kmscube/Android.mk
 
 endif
+
 """
