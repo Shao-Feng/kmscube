@@ -1,11 +1,15 @@
 LOCAL_PATH := $(call my-dir)
 #include $(LOCAL_PATH)/Android.common.mk
 include $(CLEAR_VARS)
-
 LOCAL_CPPFLAGS += \
+        -std=c99 \
         -O0 -g \
         -Wall -Wextra \
-        -std=c99 \
+        -Wunused-parameter \
+        -Wunused-variable \
+        -Wunused-function \
+        -Wno-error \
+        -Wformat \
         $(DRM_CFLAGS) \
         $(GBM_CFLAGS) \
         $(EGL_CFLAGS) \
@@ -23,6 +27,7 @@ LOCAL_SHARED_LIBRARIES := \
         libui \
         libminigbm \
         libutils \
+        libkmscubewrapper \
         libhwcservice
 
 LOCAL_C_INCLUDES := \
@@ -34,6 +39,7 @@ LOCAL_C_INCLUDES := \
         hardware/intel/external/minigbm-intel \
         hardware/intel/external/drm-intel/include/drm/ \
         hardware/intel/external/drm-intel \
+        $(LOCAL_PATH)/wrap \
         $(LOCAL_PATH)
 
 LOCAL_SRC_FILES := \
@@ -51,4 +57,5 @@ LOCAL_SRC_FILES := \
 LOCAL_EXPORT_C_INCLUDE_DIRS += $(LOCAL_PATH)
 
 LOCAL_PROPRIETARY_MODULE := true
+
 include $(BUILD_EXECUTABLE)

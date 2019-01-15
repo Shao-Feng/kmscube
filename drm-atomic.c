@@ -27,13 +27,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <signal.h>
 #include <hwcserviceapi.h>
 
 #include "common.h"
 #include "drm-common.h"
+#include "kmswrapper.h"
 
 #define VOID2U64(x) ((uint64_t)(unsigned long)(x))
+
+static volatile int keepRunning = 1;
+static volatile HWCSHANDLE hwcs = NULL;
 
 static struct drm drm = {
 	.kms_out_fence_fd = -1,
@@ -262,6 +266,14 @@ static struct drm_fb* CreateFramebuffer(int width, int height, const struct gbm 
     return fb;
 }
 
+void intHandler(int dummy) {
+    if (hwcs != NULL) {
+        if (!HwcService_EnableDRMCommit (hwcs, 1))
+             printf("Fail to enable HWC DRM commit!\n");
+    }
+    keepRunning = 0;
+}
+
 static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 {
 	struct gbm_bo *bo = NULL;
@@ -282,7 +294,23 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 
 	fb = CreateFramebuffer(KMSCUBE_DISPLAY_WIDTH, KMSCUBE_DISPLAY_HEIGHT, gbm, egl);
 
-	while (1) {
+        init_with_driver();
+        // Connect to HWC service
+        hwcs = HwcService_Connect();
+        if (hwcs == NULL) {
+            printf("Could not connect to hwcservice.\n");
+            return -1;
+        }
+        printf("Connected to hwcservice.\n");
+
+        ret = HwcService_EnableDRMCommit(hwcs, 0);
+        if (!ret) {
+            printf("Fail to disable HWC DRM commit!\n");
+        }
+
+        signal(SIGINT, intHandler);
+
+	while (keepRunning) {
 		struct gbm_bo *next_bo;
 		EGLSyncKHR gpu_fence = NULL;   /* out-fence from gpu, in-fence to kms */
 		EGLSyncKHR kms_fence = NULL;   /* in-fence to gpu, out-fence from kms */
@@ -362,15 +390,12 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		if (ret) {
 			printf("failed to commit: %s\n", strerror(errno));
 			printf("ret:%d\n", ret);
+
+                        ret = HwcService_EnableDRMCommit (hwcs, 1);
+                        if (!ret) {
+                              printf("Fail to enable HWC DRM commit!\n");
+                        }
 			//return -1;
-			uint8_t retry = 0;
-			while (ret == -16 && retry < 10){
-				usleep(15);
-				ret = drm_atomic_commit(fb->fb_id, flags);
-				printf("failed to commit in loop[%d]: %s\n", retry, strerror(errno));
-	                        printf("ret:%d\n", ret);
-				retry++;
-			}
 		}
 
 		/* release last buffer to render on again: */
