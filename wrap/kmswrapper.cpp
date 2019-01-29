@@ -21,6 +21,6 @@
 
 extern "C" void init_with_driver();
 
-void init_with_driver(){
+void init_with_driver() {
   android::ProcessState::initWithDriver("/dev/vndbinder");
 }

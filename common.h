@@ -24,13 +24,13 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
-#include <gbm.h>
 #include <drm_fourcc.h>
+#include <gbm.h>
 #include <stdbool.h>
 
 #ifndef KMSCUBE_RESERVED_MINIGBM_PLANE
@@ -47,7 +47,7 @@
 
 #ifndef EGL_KHR_platform_gbm
 #define EGL_KHR_platform_gbm 1
-#define EGL_PLATFORM_GBM_KHR              0x31D7
+#define EGL_PLATFORM_GBM_KHR 0x31D7
 #endif /* EGL_KHR_platform_gbm */
 
 #ifndef KMSCUBE_DISPLAY_WIDTH
@@ -60,13 +60,23 @@
 
 #ifndef EGL_EXT_platform_base
 #define EGL_EXT_platform_base 1
-typedef EGLDisplay (EGLAPIENTRYP PFNEGLGETPLATFORMDISPLAYEXTPROC) (EGLenum platform, void *native_display, const EGLint *attrib_list);
-typedef EGLSurface (EGLAPIENTRYP PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC) (EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list);
-typedef EGLSurface (EGLAPIENTRYP PFNEGLCREATEPLATFORMPIXMAPSURFACEEXTPROC) (EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list);
+typedef EGLDisplay(EGLAPIENTRYP PFNEGLGETPLATFORMDISPLAYEXTPROC)(
+    EGLenum platform, void *native_display, const EGLint *attrib_list);
+typedef EGLSurface(EGLAPIENTRYP PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC)(
+    EGLDisplay dpy, EGLConfig config, void *native_window,
+    const EGLint *attrib_list);
+typedef EGLSurface(EGLAPIENTRYP PFNEGLCREATEPLATFORMPIXMAPSURFACEEXTPROC)(
+    EGLDisplay dpy, EGLConfig config, void *native_pixmap,
+    const EGLint *attrib_list);
 #ifdef EGL_EGLEXT_PROTOTYPES
-EGLAPI EGLDisplay EGLAPIENTRY eglGetPlatformDisplayEXT (EGLenum platform, void *native_display, const EGLint *attrib_list);
-EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformWindowSurfaceEXT (EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list);
-EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformPixmapSurfaceEXT (EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list);
+EGLAPI EGLDisplay EGLAPIENTRY eglGetPlatformDisplayEXT(
+    EGLenum platform, void *native_display, const EGLint *attrib_list);
+EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformWindowSurfaceEXT(
+    EGLDisplay dpy, EGLConfig config, void *native_window,
+    const EGLint *attrib_list);
+EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformPixmapSurfaceEXT(
+    EGLDisplay dpy, EGLConfig config, void *native_pixmap,
+    const EGLint *attrib_list);
 #endif
 #endif /* EGL_EXT_platform_base */
 
@@ -75,9 +85,9 @@ EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformPixmapSurfaceEXT (EGLDisplay dpy,
 /* Define tokens from EGL_EXT_image_dma_buf_import_modifiers */
 #ifndef EGL_EXT_image_dma_buf_import_modifiers
 #define EGL_EXT_image_dma_buf_import_modifiers 1
-#define EGL_DMA_BUF_PLANE3_FD_EXT         0x3440
-#define EGL_DMA_BUF_PLANE3_OFFSET_EXT     0x3441
-#define EGL_DMA_BUF_PLANE3_PITCH_EXT      0x3442
+#define EGL_DMA_BUF_PLANE3_FD_EXT 0x3440
+#define EGL_DMA_BUF_PLANE3_OFFSET_EXT 0x3441
+#define EGL_DMA_BUF_PLANE3_PITCH_EXT 0x3442
 #define EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT 0x3443
 #define EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT 0x3444
 #define EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT 0x3445
@@ -89,43 +99,41 @@ EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformPixmapSurfaceEXT (EGLDisplay dpy,
 #endif
 
 struct gbm {
-	struct gbm_device *dev;
-	struct gbm_surface *surface;
-	uint32_t format;
-	int width, height;
+  struct gbm_device *dev;
+  struct gbm_surface *surface;
+  uint32_t format;
+  int width, height;
 };
 
-const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier);
-
+const struct gbm *init_gbm(int drm_fd, int w, int h, uint64_t modifier);
 
 struct egl {
-	EGLDisplay display;
-	EGLConfig config;
-	EGLContext context;
-	EGLSurface surface;
+  EGLDisplay display;
+  EGLConfig config;
+  EGLContext context;
+  EGLSurface surface;
 
-	PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT;
-	PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
-	PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
-	PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
-	PFNEGLCREATESYNCKHRPROC eglCreateSyncKHR;
-	PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
-	PFNEGLWAITSYNCKHRPROC eglWaitSyncKHR;
-	PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
-	PFNEGLDUPNATIVEFENCEFDANDROIDPROC eglDupNativeFenceFDANDROID;
+  PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT;
+  PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
+  PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
+  PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
+  PFNEGLCREATESYNCKHRPROC eglCreateSyncKHR;
+  PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
+  PFNEGLWAITSYNCKHRPROC eglWaitSyncKHR;
+  PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
+  PFNEGLDUPNATIVEFENCEFDANDROIDPROC eglDupNativeFenceFDANDROID;
 
-	bool modifiers_supported;
+  bool modifiers_supported;
 
-	void (*draw)(unsigned i);
+  void (*draw)(unsigned i);
 };
 
-static inline int __egl_check(void *ptr, const char *name)
-{
-	if (!ptr) {
-		printf("no %s\n", name);
-		return -1;
-	}
-	return 0;
+static inline int __egl_check(void *ptr, const char *name) {
+  if (!ptr) {
+    printf("no %s\n", name);
+    return -1;
+  }
+  return 0;
 }
 
 #define egl_check(egl, name) __egl_check((egl)->name, #name)
@@ -135,32 +143,37 @@ int create_program(const char *vs_src, const char *fs_src);
 int link_program(unsigned program);
 
 enum mode {
-	SMOOTH,        /* smooth-shaded */
-	RGBA,          /* single-plane RGBA */
-	NV12_2IMG,     /* NV12, handled as two textures and converted to RGB in shader */
-	NV12_1IMG,     /* NV12, imported as planar YUV eglimg */
-	VIDEO,         /* video textured cube */
+  SMOOTH,    /* smooth-shaded */
+  RGBA,      /* single-plane RGBA */
+  NV12_2IMG, /* NV12, handled as two textures and converted to RGB in shader */
+  NV12_1IMG, /* NV12, imported as planar YUV eglimg */
+  VIDEO,     /* video textured cube */
 };
 
-const struct egl * init_cube_smooth(const struct gbm *gbm, int samples);
-const struct egl * init_cube_tex(const struct gbm *gbm, enum mode mode, int samples);
+const struct egl *init_cube_smooth(const struct gbm *gbm, int samples);
+const struct egl *init_cube_tex(const struct gbm *gbm, enum mode mode,
+                                int samples);
 
 #ifdef HAVE_GST
 
 struct decoder;
-struct decoder * video_init(const struct egl *egl, const struct gbm *gbm, const char *filename);
+struct decoder *video_init(const struct egl *egl, const struct gbm *gbm,
+                           const char *filename);
 EGLImage video_frame(struct decoder *dec);
 void video_deinit(struct decoder *dec);
 
-const struct egl * init_cube_video(const struct gbm *gbm, const char *video, int samples);
+const struct egl *init_cube_video(const struct gbm *gbm, const char *video,
+                                  int samples);
 
 #else
-static inline const struct egl *
-init_cube_video(const struct gbm *gbm, const char *video, int samples)
-{
-	(void)gbm; (void)video; (void)samples;
-	printf("no GStreamer support!\n");
-	return NULL;
+static inline const struct egl *init_cube_video(const struct gbm *gbm,
+                                                const char *video,
+                                                int samples) {
+  (void)gbm;
+  (void)video;
+  (void)samples;
+  printf("no GStreamer support!\n");
+  return NULL;
 }
 #endif
 

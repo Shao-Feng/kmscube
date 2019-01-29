@@ -24,6 +24,6 @@ extern "C" {
 void init_with_driver();
 
 #ifdef __cplusplus
-} //end extern "C"
+}  // end extern "C"
 #endif
 #endif /* _WRAPPER_H */

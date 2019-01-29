@@ -22,333 +22,290 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "common.h"
 
 static struct gbm gbm;
 
-WEAK struct gbm_surface *
-gbm_surface_create_with_modifiers(struct gbm_device *gbm,
-                                  uint32_t width, uint32_t height,
-                                  uint32_t format,
-                                  const uint64_t *modifiers,
-                                  const unsigned int count);
+WEAK struct gbm_surface *gbm_surface_create_with_modifiers(
+    struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format,
+    const uint64_t *modifiers, const unsigned int count);
 
-const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
-{
-        printf("drm_fd: %d\n", drm_fd);
-	gbm.dev = gbm_create_device(drm_fd);
-        //gbm.dev = EGL_DEFAULT_DISPLAY;
-	gbm.format = GBM_FORMAT_XRGB8888;
-	gbm.surface = NULL;
+const struct gbm *init_gbm(int drm_fd, int w, int h, uint64_t modifier) {
+  printf("drm_fd: %d\n", drm_fd);
+  gbm.dev = gbm_create_device(drm_fd);
+  gbm.format = GBM_FORMAT_XRGB8888;
+  gbm.surface = NULL;
 
-	if (gbm_surface_create_with_modifiers) {
-		gbm.surface = gbm_surface_create_with_modifiers(gbm.dev, w, h,
-								gbm.format,
-								&modifier, 1);
+  if (gbm_surface_create_with_modifiers) {
+    gbm.surface = gbm_surface_create_with_modifiers(gbm.dev, w, h, gbm.format,
+                                                    &modifier, 1);
+  }
 
-	}
+  if (!gbm.surface) {
+    if (modifier != DRM_FORMAT_MOD_LINEAR) {
+      fprintf(stderr, "Modifiers requested but support isn't available\n");
+      return NULL;
+    }
+    gbm.surface = gbm_surface_create(gbm.dev, w, h, gbm.format,
+                                     GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+  }
 
-	if (!gbm.surface) {
-		if (modifier != DRM_FORMAT_MOD_LINEAR) {
-			fprintf(stderr, "Modifiers requested but support isn't available\n");
-			return NULL;
-		}
-		gbm.surface = gbm_surface_create(gbm.dev, w, h,
-						gbm.format,
-						GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+  if (!gbm.surface) {
+    printf("failed to create gbm surface\n");
+    return NULL;
+  }
 
-	}
+  gbm.width = w;
+  gbm.height = h;
 
-	if (!gbm.surface) {
-		printf("failed to create gbm surface\n");
-		return NULL;
-	}
-
-	gbm.width = w;
-	gbm.height = h;
-
-	return &gbm;
+  return &gbm;
 }
 
-static bool has_ext(const char *extension_list, const char *ext)
-{
-	const char *ptr = extension_list;
-	int len = strlen(ext);
+static bool has_ext(const char *extension_list, const char *ext) {
+  const char *ptr = extension_list;
+  int len = strlen(ext);
 
-	if (ptr == NULL || *ptr == '\0')
-		return false;
+  if (ptr == NULL || *ptr == '\0')
+    return false;
 
-	while (true) {
-		ptr = strstr(ptr, ext);
-		if (!ptr)
-			return false;
+  while (true) {
+    ptr = strstr(ptr, ext);
+    if (!ptr)
+      return false;
 
-		if (ptr[len] == ' ' || ptr[len] == '\0')
-			return true;
+    if (ptr[len] == ' ' || ptr[len] == '\0')
+      return true;
 
-		ptr += len;
-	}
+    ptr += len;
+  }
 }
 
-static int
-match_config_to_visual(EGLDisplay egl_display,
-		       EGLint visual_id,
-		       EGLConfig *configs,
-		       int count)
-{
-	int i;
+static int match_config_to_visual(EGLDisplay egl_display, EGLint visual_id,
+                                  EGLConfig *configs, int count) {
+  int i;
 
-	for (i = 0; i < count; ++i) {
-		EGLint id;
+  for (i = 0; i < count; ++i) {
+    EGLint id;
 
-		if (!eglGetConfigAttrib(egl_display,
-				configs[i], EGL_NATIVE_VISUAL_ID,
-				&id))
-			continue;
+    if (!eglGetConfigAttrib(egl_display, configs[i], EGL_NATIVE_VISUAL_ID, &id))
+      continue;
 
-		if (id == visual_id)
-			return i;
-	}
+    if (id == visual_id)
+      return i;
+  }
 
-	return -1;
+  return -1;
 }
 
-static bool
-egl_choose_config(EGLDisplay egl_display, const EGLint *attribs,
-                  EGLint visual_id, EGLConfig *config_out)
-{
-	EGLint count = 1;
-	EGLint matched = 0;
+static bool egl_choose_config(EGLDisplay egl_display, const EGLint *attribs,
+                              EGLint visual_id, EGLConfig *config_out) {
+  EGLint count = 1;
+  EGLint matched = 0;
 
-	if (!eglChooseConfig(egl_display, attribs, config_out,
-			      count, &matched) || matched != 1) {
-		printf("No EGL configs with appropriate attributes.\n");
-                return false;
-	}
-	return true;
+  if (!eglChooseConfig(egl_display, attribs, config_out, count, &matched) ||
+      matched != 1) {
+    printf("No EGL configs with appropriate attributes.\n");
+    return false;
+  }
+  return true;
 }
 
-int init_egl(struct egl *egl, const struct gbm *gbm, int samples)
-{
-	EGLint major, minor;
+int init_egl(struct egl *egl, const struct gbm *gbm, int samples) {
+  EGLint major, minor;
 
-        /*
-	static const EGLint context_attribs[] = {
-		EGL_CONTEXT_CLIENT_VERSION, 2,
-		EGL_NONE
-	};
-
-	const EGLint config_attribs[] = {
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_RED_SIZE, 1,
-		EGL_GREEN_SIZE, 1,
-		EGL_BLUE_SIZE, 1,
-		EGL_ALPHA_SIZE, 0,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-		EGL_SAMPLES, samples,
-		EGL_NONE
-	};*/
-	
-        static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2,
+  static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2,
                                            EGL_NONE};
 
-        const EGLint config_attribs[] = {EGL_SURFACE_TYPE, EGL_DONT_CARE,
-                                          EGL_NONE};
+  const EGLint config_attribs[] = {EGL_SURFACE_TYPE, EGL_DONT_CARE, EGL_NONE};
 
-	const char *egl_exts_client, *egl_exts_dpy, *gl_exts;
+  const char *egl_exts_client, *egl_exts_dpy, *gl_exts;
 
-#define get_proc_client(ext, name) do { \
-		if (has_ext(egl_exts_client, #ext)) \
-			egl->name = (void *)eglGetProcAddress(#name); \
-	} while (0)
-#define get_proc_dpy(ext, name) do { \
-		if (has_ext(egl_exts_dpy, #ext)) \
-			egl->name = (void *)eglGetProcAddress(#name); \
-	} while (0)
+#define get_proc_client(ext, name)                  \
+  do {                                              \
+    if (has_ext(egl_exts_client, #ext))             \
+      egl->name = (void *)eglGetProcAddress(#name); \
+  } while (0)
+#define get_proc_dpy(ext, name)                     \
+  do {                                              \
+    if (has_ext(egl_exts_dpy, #ext))                \
+      egl->name = (void *)eglGetProcAddress(#name); \
+  } while (0)
 
-#define get_proc_gl(ext, name) do { \
-		if (has_ext(gl_exts, #ext)) \
-			egl->name = (void *)eglGetProcAddress(#name); \
-	} while (0)
+#define get_proc_gl(ext, name)                      \
+  do {                                              \
+    if (has_ext(gl_exts, #ext))                     \
+      egl->name = (void *)eglGetProcAddress(#name); \
+  } while (0)
 
-	egl_exts_client = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+  egl_exts_client = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
 
-	egl->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  egl->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
-	if (!eglInitialize(egl->display, &major, &minor)) {
-		printf("failed to initialize\n");
-		return -1;
-	}
+  if (!eglInitialize(egl->display, &major, &minor)) {
+    printf("failed to initialize\n");
+    return -1;
+  }
 
-	egl_exts_dpy = eglQueryString(egl->display, EGL_EXTENSIONS);
-	get_proc_dpy(EGL_KHR_image_base, eglCreateImageKHR);
-	get_proc_dpy(EGL_KHR_image_base, eglDestroyImageKHR);
-	get_proc_dpy(EGL_KHR_fence_sync, eglCreateSyncKHR);
-	get_proc_dpy(EGL_KHR_fence_sync, eglDestroySyncKHR);
-	get_proc_dpy(EGL_KHR_fence_sync, eglWaitSyncKHR);
-	get_proc_dpy(EGL_KHR_fence_sync, eglClientWaitSyncKHR);
-	get_proc_dpy(EGL_ANDROID_native_fence_sync, eglDupNativeFenceFDANDROID);
+  egl_exts_dpy = eglQueryString(egl->display, EGL_EXTENSIONS);
+  get_proc_dpy(EGL_KHR_image_base, eglCreateImageKHR);
+  get_proc_dpy(EGL_KHR_image_base, eglDestroyImageKHR);
+  get_proc_dpy(EGL_KHR_fence_sync, eglCreateSyncKHR);
+  get_proc_dpy(EGL_KHR_fence_sync, eglDestroySyncKHR);
+  get_proc_dpy(EGL_KHR_fence_sync, eglWaitSyncKHR);
+  get_proc_dpy(EGL_KHR_fence_sync, eglClientWaitSyncKHR);
+  get_proc_dpy(EGL_ANDROID_native_fence_sync, eglDupNativeFenceFDANDROID);
 
-#define get_proc(name, proc)                  \
-  do {                                        \
+#define get_proc(name, proc)                    \
+  do {                                          \
     egl->name = (proc)eglGetProcAddress(#name); \
     assert(egl->name);                          \
   } while (0)
-	get_proc(eglCreateImageKHR, PFNEGLCREATEIMAGEKHRPROC);
-	get_proc(eglCreateSyncKHR, PFNEGLCREATESYNCKHRPROC);
-	get_proc(eglDestroySyncKHR, PFNEGLDESTROYSYNCKHRPROC);
-	get_proc(eglWaitSyncKHR, PFNEGLWAITSYNCKHRPROC);
-	get_proc(eglClientWaitSyncKHR, PFNEGLCLIENTWAITSYNCKHRPROC);
-	get_proc(eglDupNativeFenceFDANDROID, PFNEGLDUPNATIVEFENCEFDANDROIDPROC);
-	get_proc(glEGLImageTargetTexture2DOES, PFNGLEGLIMAGETARGETTEXTURE2DOESPROC);
-	get_proc(eglDestroyImageKHR, PFNEGLDESTROYIMAGEKHRPROC);
+  get_proc(eglCreateImageKHR, PFNEGLCREATEIMAGEKHRPROC);
+  get_proc(eglCreateSyncKHR, PFNEGLCREATESYNCKHRPROC);
+  get_proc(eglDestroySyncKHR, PFNEGLDESTROYSYNCKHRPROC);
+  get_proc(eglWaitSyncKHR, PFNEGLWAITSYNCKHRPROC);
+  get_proc(eglClientWaitSyncKHR, PFNEGLCLIENTWAITSYNCKHRPROC);
+  get_proc(eglDupNativeFenceFDANDROID, PFNEGLDUPNATIVEFENCEFDANDROIDPROC);
+  get_proc(glEGLImageTargetTexture2DOES, PFNGLEGLIMAGETARGETTEXTURE2DOESPROC);
+  get_proc(eglDestroyImageKHR, PFNEGLDESTROYIMAGEKHRPROC);
 
-	egl->modifiers_supported = has_ext(egl_exts_dpy,
-					   "EGL_EXT_image_dma_buf_import_modifiers");
+  egl->modifiers_supported =
+      has_ext(egl_exts_dpy, "EGL_EXT_image_dma_buf_import_modifiers");
 
-	printf("Using display %p with EGL version %d.%d\n",
-			egl->display, major, minor);
+  printf("Using display %p with EGL version %d.%d\n", egl->display, major,
+         minor);
 
-	printf("===================================\n");
-	printf("EGL information:\n");
-	printf("  version: \"%s\"\n", eglQueryString(egl->display, EGL_VERSION));
-	printf("  vendor: \"%s\"\n", eglQueryString(egl->display, EGL_VENDOR));
-	printf("  client extensions: \"%s\"\n", egl_exts_client);
-	printf("  display extensions: \"%s\"\n", egl_exts_dpy);
-	printf("===================================\n");
+  printf("===================================\n");
+  printf("EGL information:\n");
+  printf("  version: \"%s\"\n", eglQueryString(egl->display, EGL_VERSION));
+  printf("  vendor: \"%s\"\n", eglQueryString(egl->display, EGL_VENDOR));
+  printf("  client extensions: \"%s\"\n", egl_exts_client);
+  printf("  display extensions: \"%s\"\n", egl_exts_dpy);
+  printf("===================================\n");
 
-	if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-		printf("failed to bind api EGL_OPENGL_ES_API\n");
-		return -1;
-	}
+  if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+    printf("failed to bind api EGL_OPENGL_ES_API\n");
+    return -1;
+  }
 
-	if (!egl_choose_config(egl->display, config_attribs, gbm->format,
-                               &egl->config)) {
-		printf("failed to choose config\n");
-		return -1;
-	}
+  if (!egl_choose_config(egl->display, config_attribs, gbm->format,
+                         &egl->config)) {
+    printf("failed to choose config\n");
+    return -1;
+  }
 
-        if (egl->config == NULL){
-                printf("Config is NULL\n");
-                return -1;
-        }
+  if (egl->config == NULL) {
+    printf("Config is NULL\n");
+    return -1;
+  }
 
-	egl->context = eglCreateContext(egl->display, egl->config,
-			EGL_NO_CONTEXT, context_attribs);
-	if (egl->context == NULL) {
-		printf("failed to create context\n");
-		return -1;
-	}
+  egl->context = eglCreateContext(egl->display, egl->config, EGL_NO_CONTEXT,
+                                  context_attribs);
+  if (egl->context == NULL) {
+    printf("failed to create context\n");
+    return -1;
+  }
 
-        /*
-	egl->surface = eglCreateWindowSurface(egl->display, egl->config,
-			(EGLNativeWindowType)gbm->surface, NULL);
-	if (egl->surface == EGL_NO_SURFACE) {
-		printf("failed to create egl surface\n");
-		return -1;
-	}*/
+  /* connect the context to the surface */
+  // eglMakeCurrent(egl->display, egl->surface, egl->surface, egl->context);
+  eglMakeCurrent(egl->display, EGL_NO_SURFACE, EGL_NO_SURFACE, egl->context);
 
-	/* connect the context to the surface */
-	//eglMakeCurrent(egl->display, egl->surface, egl->surface, egl->context);
-	eglMakeCurrent(egl->display, EGL_NO_SURFACE, EGL_NO_SURFACE, egl->context);
+  gl_exts = (char *)glGetString(GL_EXTENSIONS);
+  printf("OpenGL ES 2.x information:\n");
+  printf("  version: \"%s\"\n", glGetString(GL_VERSION));
+  printf("  shading language version: \"%s\"\n",
+         glGetString(GL_SHADING_LANGUAGE_VERSION));
+  printf("  vendor: \"%s\"\n", glGetString(GL_VENDOR));
+  printf("  renderer: \"%s\"\n", glGetString(GL_RENDERER));
+  printf("  extensions: \"%s\"\n", gl_exts);
+  printf("===================================\n");
 
-	gl_exts = (char *) glGetString(GL_EXTENSIONS);
-	printf("OpenGL ES 2.x information:\n");
-	printf("  version: \"%s\"\n", glGetString(GL_VERSION));
-	printf("  shading language version: \"%s\"\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
-	printf("  vendor: \"%s\"\n", glGetString(GL_VENDOR));
-	printf("  renderer: \"%s\"\n", glGetString(GL_RENDERER));
-	printf("  extensions: \"%s\"\n", gl_exts);
-	printf("===================================\n");
+  get_proc_gl(GL_OES_EGL_image, glEGLImageTargetTexture2DOES);
 
-	get_proc_gl(GL_OES_EGL_image, glEGLImageTargetTexture2DOES);
-
-	return 0;
+  return 0;
 }
 
-int create_program(const char *vs_src, const char *fs_src)
-{
-	GLuint vertex_shader, fragment_shader, program;
-	GLint ret;
+int create_program(const char *vs_src, const char *fs_src) {
+  GLuint vertex_shader, fragment_shader, program;
+  GLint ret;
 
-	vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 
-	glShaderSource(vertex_shader, 1, &vs_src, NULL);
-	glCompileShader(vertex_shader);
+  glShaderSource(vertex_shader, 1, &vs_src, NULL);
+  glCompileShader(vertex_shader);
 
-	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &ret);
-	if (!ret) {
-		char *log;
+  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &ret);
+  if (!ret) {
+    char *log;
 
-		printf("vertex shader compilation failed!:\n");
-		glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &ret);
-		if (ret > 1) {
-			log = malloc(ret);
-			glGetShaderInfoLog(vertex_shader, ret, NULL, log);
-			printf("%s", log);
-		}
+    printf("vertex shader compilation failed!:\n");
+    glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &ret);
+    if (ret > 1) {
+      log = malloc(ret);
+      glGetShaderInfoLog(vertex_shader, ret, NULL, log);
+      printf("%s", log);
+    }
 
-		return -1;
-	}
+    return -1;
+  }
 
-	fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
-	glShaderSource(fragment_shader, 1, &fs_src, NULL);
-	glCompileShader(fragment_shader);
+  glShaderSource(fragment_shader, 1, &fs_src, NULL);
+  glCompileShader(fragment_shader);
 
-	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &ret);
-	if (!ret) {
-		char *log;
+  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &ret);
+  if (!ret) {
+    char *log;
 
-		printf("fragment shader compilation failed!:\n");
-		glGetShaderiv(fragment_shader, GL_INFO_LOG_LENGTH, &ret);
+    printf("fragment shader compilation failed!:\n");
+    glGetShaderiv(fragment_shader, GL_INFO_LOG_LENGTH, &ret);
 
-		if (ret > 1) {
-			log = malloc(ret);
-			glGetShaderInfoLog(fragment_shader, ret, NULL, log);
-			printf("%s", log);
-		}
+    if (ret > 1) {
+      log = malloc(ret);
+      glGetShaderInfoLog(fragment_shader, ret, NULL, log);
+      printf("%s", log);
+    }
 
-		return -1;
-	}
+    return -1;
+  }
 
-	program = glCreateProgram();
+  program = glCreateProgram();
 
-	glAttachShader(program, vertex_shader);
-	glAttachShader(program, fragment_shader);
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
 
-	return program;
+  return program;
 }
 
-int link_program(unsigned program)
-{
-	GLint ret;
+int link_program(unsigned program) {
+  GLint ret;
 
-	glLinkProgram(program);
+  glLinkProgram(program);
 
-	glGetProgramiv(program, GL_LINK_STATUS, &ret);
-	if (!ret) {
-		char *log;
+  glGetProgramiv(program, GL_LINK_STATUS, &ret);
+  if (!ret) {
+    char *log;
 
-		printf("program linking failed!:\n");
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &ret);
+    printf("program linking failed!:\n");
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &ret);
 
-		if (ret > 1) {
-			log = malloc(ret);
-			glGetProgramInfoLog(program, ret, NULL, log);
-			printf("%s", log);
-		}
+    if (ret > 1) {
+      log = malloc(ret);
+      glGetProgramInfoLog(program, ret, NULL, log);
+      printf("%s", log);
+    }
 
-		return -1;
-	}
+    return -1;
+  }
 
-	return 0;
+  return 0;
 }
