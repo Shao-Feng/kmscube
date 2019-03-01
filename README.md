@@ -23,10 +23,14 @@ Dependent on kernel-patch, libminigbm, libhwcservice, and libkmscubewrapper.
 minigbm is not built by default in 1A repo (only gralloc will be built).
 
 
-Patch Kernel
+Patch Kernel (For using EnableDrmCommit API to syncing with HWC)
 ==========
 
-A kernel patch must be applyed. https://android.intel.com/#/c/639800/4
+If using "ResetDrmMaster", no Kernel patch is needed. the DRM master will be switch smoothly between KMSCube and DrmMaster.
+
+If using EnableDrmCommit API to syncing with HWC, 
+
+a kernel patch must be applyed. https://android.intel.com/#/c/639800/4
 
 Enter the kernel forlder and cherrypick the patch.
 
