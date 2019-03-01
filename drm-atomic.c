@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/file.h>
 
 #include "common.h"
 #include "drm-common.h"
@@ -38,6 +39,8 @@
 
 static volatile int keepRunning = 1;
 static volatile HWCSHANDLE hwcs = NULL;
+
+static int lock_fd_ = 0;
 
 static struct drm drm = {
     .kms_out_fence_fd = -1,
@@ -257,12 +260,60 @@ static struct drm_fb *CreateFramebuffer(int width, int height,
   return fb;
 }
 
+int prepare_hwc_connect(){
+  init_with_driver();
+  // Connect to HWC service
+  hwcs = HwcService_Connect();
+  if (hwcs == NULL) {
+    printf("Could not connect to hwcservice.\n");
+    return -1;
+  }
+  printf("Connected to hwcservice.\n");
+  lock_fd_ = open("/vendor/hwc.lock", O_RDONLY);
+  return lock_fd_;
+}
+
+int enable_hwc_commit(int enable){
+  int ret;
+  if (!enable){
+    if (-1 != lock_fd_){
+      if (flock(lock_fd_, LOCK_EX) != 0)
+        printf("Fail to lock /vendor/hwc.lock \n");
+      else
+        printf("Successfully lock /vendor/hwc.lock \n");
+    } else {
+      printf("Fail to open /vendor/hwc.lock \n");
+    }
+  } else {
+    drmDropMaster(drm.fd);
+    if (-1 != lock_fd_){
+      if (flock(lock_fd_, LOCK_UN) != 0){
+        printf("Fail to unlock /vendor/hwc.lock \n");
+      } else {
+        printf("Successfully unlock /vendor/hwc.lock \n");
+      }
+      close(lock_fd_);
+      lock_fd_ = -1;
+    }
+  }
+  //ret = HwcService_EnableDRMCommit(hwcs, enable, 0);
+  ret = HwcService_ResetDrmMaster(hwcs, !enable);
+  if (!ret) {
+    printf("Fail to enable HWC DRM commit with %s!\n", enable == 0?"False":"True");
+  }else{
+    printf("Successfully enable HWC DRM commit with %s!\n", enable == 0?"False":"True");
+    if (!enable)
+      drmSetMaster(drm.fd);
+  }
+  return ret;
+}
+
 void intHandler(int dummy) {
   if (hwcs != NULL) {
-    if (!HwcService_EnableDRMCommit(hwcs, 1, 0))
-      printf("Fail to enable HWC DRM commit!\n");
+    enable_hwc_commit(1);
   }
   keepRunning = 0;
+  drmDropMaster(drm.fd);
 }
 
 static int atomic_run(const struct gbm *gbm, const struct egl *egl) {
@@ -282,20 +333,12 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl) {
 
   fb = CreateFramebuffer(KMSCUBE_DISPLAY_WIDTH, KMSCUBE_DISPLAY_HEIGHT, gbm,
                          egl);
-
-  init_with_driver();
-  // Connect to HWC service
-  hwcs = HwcService_Connect();
-  if (hwcs == NULL) {
-    printf("Could not connect to hwcservice.\n");
+  if (prepare_hwc_connect() == -1){
+    printf("Fail to open /vendor/hwc.lock \n");
     return -1;
   }
-  printf("Connected to hwcservice.\n");
-
-  ret = HwcService_EnableDRMCommit(hwcs, 0, 0);
-  if (!ret) {
-    printf("Fail to disable HWC DRM commit!\n");
-  }
+    
+  ret = enable_hwc_commit(0);
 
   signal(SIGINT, intHandler);
 
@@ -368,11 +411,8 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl) {
       printf("failed to commit: %s\n", strerror(errno));
       printf("ret:%d\n", ret);
 
-      ret = HwcService_EnableDRMCommit(hwcs, 1, 0);
-      if (!ret) {
-        printf("Fail to enable HWC DRM commit!\n");
-      }
-      // return -1;
+      //enable_hwc_commit(1);
+      return -1;
     }
 
     /* release last buffer to render on again: */
