@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <sys/file.h>
 
+#include <sys/time.h>
+
 #include "common.h"
 #include "drm-common.h"
 #include "kmswrapper.h"
@@ -227,7 +229,7 @@ static struct drm_fb *CreateFramebuffer(int width, int height,
       egl->eglCreateImageKHR(egl->display, EGL_NO_CONTEXT,
                              EGL_LINUX_DMA_BUF_EXT, NULL, khr_image_attrs);
   if (image == EGL_NO_IMAGE_KHR) {
-    printf("failed to make image from buffer object: %s\n", eglGetError());
+    printf("failed to make image from buffer object: %d\n", eglGetError());
     return fb;
   }
 
@@ -273,9 +275,8 @@ int prepare_hwc_connect(){
   return lock_fd_;
 }
 
-int enable_hwc_commit(int enable){
-  int ret;
-  if (!enable){
+void lock_hwc_lock(int lock){
+  if (lock){
     if (-1 != lock_fd_){
       if (flock(lock_fd_, LOCK_EX) != 0)
         printf("Fail to lock /vendor/hwc.lock \n");
@@ -285,7 +286,6 @@ int enable_hwc_commit(int enable){
       printf("Fail to open /vendor/hwc.lock \n");
     }
   } else {
-    drmDropMaster(drm.fd);
     if (-1 != lock_fd_){
       if (flock(lock_fd_, LOCK_UN) != 0){
         printf("Fail to unlock /vendor/hwc.lock \n");
@@ -296,24 +296,37 @@ int enable_hwc_commit(int enable){
       lock_fd_ = -1;
     }
   }
-  //ret = HwcService_EnableDRMCommit(hwcs, enable, 0);
-  ret = HwcService_ResetDrmMaster(hwcs, !enable);
-  if (!ret) {
-    printf("Fail to enable HWC DRM commit with %s!\n", enable == 0?"False":"True");
-  }else{
+}
+
+int enable_hwc_commit(int enable){
+  int ret = 1;
+  if (enable) {
+    drmDropMaster(drm.fd);
+    ret = HwcService_ResetDrmMaster(hwcs, !enable);
+    lock_hwc_lock(!enable);
+  } else {
+    lock_hwc_lock(!enable);
+    ret = HwcService_ResetDrmMaster(hwcs, !enable);
+    drmSetMaster(drm.fd);
+  }
+  if (ret) {
     printf("Successfully enable HWC DRM commit with %s!\n", enable == 0?"False":"True");
-    if (!enable)
-      drmSetMaster(drm.fd);
+  }else{
+    printf("Fail to enable HWC DRM commit with %s!\n", enable == 0?"False":"True");
   }
   return ret;
 }
 
 void intHandler(int dummy) {
-  if (hwcs != NULL) {
-    enable_hwc_commit(1);
-  }
   keepRunning = 0;
-  drmDropMaster(drm.fd);
+  if (hwcs != NULL) {
+    struct timeval te; 
+    gettimeofday(&te, NULL); // get current time
+    long long milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; // calculate milliseconds
+    printf("Enabling HWC in milliseconds: %lld\n", milliseconds);
+    //drmDropMaster(drm.fd); //40ms
+    enable_hwc_commit(1); //15ms
+  }
 }
 
 static int atomic_run(const struct gbm *gbm, const struct egl *egl) {
