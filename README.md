@@ -20,20 +20,20 @@ Dependency
 =======
 
 Dependent on libminigbm, libhwcservice, and libkmscubewrapper.
-minigbm is not built by default in Celadon repo (only gralloc will be built).
+minigbm is not built by default in Android repo (only gralloc will be built).
 
 
 Build minigbm manually
 ==========
 
-By default, only gralloc is built on 1A repo tree. For building libminigbm, 
+By default, only gralloc is built in Android repo tree. For building libminigbm, 
 
 apply the patch '0001-Build-libminigbm.so-for-compiling-kmscube.patch' in minigbm-intel https://github.com/intel/minigbm
 
 
 cd <Minigbm_HOME>
 
-git am <Commitswitch_HOME>/0001-Build-libminigbm.so-for-compiling-kmscube.patch
+git am <KMS_CUBE_HOME>/0001-Build-libminigbm.so-for-compiling-kmscube.patch
 
 
 Once minigbm is built successfully. 
@@ -44,7 +44,7 @@ adb root
 
 adb remount
 
-cd <1A_OUT_PRODUCT_HOME>/vendor/lib64/hw/
+cd <ANDROID_OUT_PRODUCT_HOME>/vendor/lib64/hw/
 
 adb push libminigbm.so /vendor/lib64/
 
@@ -84,7 +84,7 @@ adb root
 
 adb remount
 
-cd <1A_OUT_PRODUCT_HOME>/vendor/lib64/
+cd <ANDROID_OUT_PRODUCT_HOME>/vendor/lib64/
 
 adb push libkmscubewrapper.so /vendor/lib64/
 
