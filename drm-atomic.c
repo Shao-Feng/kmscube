@@ -450,17 +450,15 @@ static int get_plane_id(void) {
   drmModePlaneResPtr plane_resources;
   uint32_t i, j;
   int ret = -EINVAL;
-  int found_reserved = 0;
+  int found_primary = 0;
 
   plane_resources = drmModeGetPlaneResources(drm.fd);
   if (!plane_resources) {
     printf("drmModeGetPlaneResources failed: %s\n", strerror(errno));
     return -1;
   }
-  // only third plane is reserved
-  for (i = 0; (i < plane_resources->count_planes) && !found_reserved; i++) {
+  for (i = 0; (i < plane_resources->count_planes) && !found_primary; i++) {
     uint32_t id = plane_resources->planes[i];
-    printf("------------Plane[%d]-------------\n", id);
     drmModePlanePtr plane = drmModeGetPlane(drm.fd, id);
     if (!plane) {
       printf("drmModeGetPlane(%u) failed: %s\n", id, strerror(errno));
@@ -470,12 +468,6 @@ static int get_plane_id(void) {
     if (plane->possible_crtcs & (1 << drm.crtc_index)) {
       drmModeObjectPropertiesPtr props =
           drmModeObjectGetProperties(drm.fd, id, DRM_MODE_OBJECT_PLANE);
-      // Third plane is reserved
-      if (i == 2) {
-        ret = id;
-        found_reserved = 1;
-      }
-#ifdef USE_PRIMARY_PLANE
       /* primary or not, this plane is good enough to use: */
       ret = id;
 
@@ -490,7 +482,6 @@ static int get_plane_id(void) {
 
         drmModeFreeProperty(p);
       }
-#endif
       drmModeFreeObjectProperties(props);
     }
 

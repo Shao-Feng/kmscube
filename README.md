@@ -19,28 +19,9 @@ Build on Android
 Dependency
 =======
 
-Dependent on kernel-patch, libminigbm, libhwcservice, and libkmscubewrapper.
-minigbm is not built by default in 1A repo (only gralloc will be built).
+Dependent on libminigbm, libhwcservice, and libkmscubewrapper.
+minigbm is not built by default in Celadon repo (only gralloc will be built).
 
-
-Patch Kernel (For using EnableDrmCommit API to syncing with HWC)
-==========
-
-If using "ResetDrmMaster", no Kernel patch is needed. the DRM master will be switch smoothly between KMSCube and DrmMaster.
-
-If using EnableDrmCommit API to syncing with HWC, 
-
-a kernel patch must be applyed. https://android.intel.com/#/c/639800/4
-
-Enter the kernel forlder and cherrypick the patch.
-
-as below:
-
-cd <1A_Repo_PATH>/kernel/<kernel_version>/
-
-git fetch ssh://<useraccount>@android.intel.com:29418/a/bsp/kernel/config-lts-414 refs/changes/00/639800/4 && git cherry-pick FETCH_HEAD 
-
-re-flash kernel or rebuild the whole image for applying kernel patch
 
 Build minigbm manually
 ==========
@@ -117,18 +98,30 @@ adb push hw/hwcomposer.broxton.so /vendor/lib64/hw/
 
 adb push ../lib/hw/hwcomposer.broxton.so /vendor/lib/hw/
 
-adb push ../bin/kmscube /data/
+adb push ../bin/kmscube /vendor/bin/
 
 
 
 Launch kmscube
 ===============
 
-This demo must be launched as root.
+This demo must be launched as root. 
+
+(Celadon only begin)
+
+On Celadon, need to create hwc lock.
+
+adb root
+
+adb remount
+
+adb shell touch /vendor/hwc.lock
+
+(Celadon only end)
 
 adb root
 
 adb shell
 
-/data/kmscube
+/vendor/bin/kmscube
 

@@ -19,7 +19,7 @@ LOCAL_MODULE := kmscube
 
 LOCAL_SHARED_LIBRARIES := \
         libcutils \
-        libdrm_pri \
+        libdrm \
         libEGL \
         libGLESv3 \
         liblog \

@@ -51,11 +51,11 @@
 #endif /* EGL_KHR_platform_gbm */
 
 #ifndef KMSCUBE_DISPLAY_WIDTH
-#define KMSCUBE_DISPLAY_WIDTH 800
+#define KMSCUBE_DISPLAY_WIDTH 3840 
 #endif
 
 #ifndef KMSCUBE_DISPLAY_HEIGHT
-#define KMSCUBE_DISPLAY_HEIGHT 600
+#define KMSCUBE_DISPLAY_HEIGHT 2160
 #endif
 
 #ifndef EGL_EXT_platform_base
